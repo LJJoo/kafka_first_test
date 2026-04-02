@@ -1,3 +1,26 @@
 spring:
   application:
     name: kafka-test1
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:3306/kafka_test?useSSL=false&autoReconnect=true&serverTimezone=Asia/Seoul
+    username: ${DB_USER:root}
+    password: ${DB_PASS:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+
+  kafka:
+    bootstrap-servers: ${KAFKA_HOST:localhost}:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+server:
+  port: 8080
