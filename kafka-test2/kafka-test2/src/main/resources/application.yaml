@@ -3,9 +3,9 @@ spring:
     name: kafka-test2
 
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:3306/kafka_test?useSSL=false&autoReconnect=true&serverTimezone=Asia/Seoul
-    username: ${DB_USER:root}
-    password: ${DB_PASS:root}
+    url: jdbc:mysql://${DB_HOST}:3306/${DB_NAME}?useSSL=false&autoReconnect=true&serverTimezone=Asia/Seoul
+    username: ${DB_USER}
+    password: ${DB_PASS}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
@@ -17,7 +17,7 @@ spring:
         dialect: org.hibernate.dialect.MySQL8Dialect
 
   kafka:
-    bootstrap-servers: ${KAFKA_HOST:localhost}:9092
+    bootstrap-servers: ${KAFKA_HOST}:9092
     consumer:
       group-id: order-group
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
