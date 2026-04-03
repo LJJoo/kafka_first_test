@@ -254,7 +254,18 @@ function App() {
   };
 
   const handleCopy = (cmd) => {
-    navigator.clipboard.writeText(cmd);
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(cmd);
+    } else {
+      const el = document.createElement('textarea');
+      el.value = cmd;
+      el.style.position = 'fixed';
+      el.style.opacity = '0';
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+    }
     setCopiedCmd(cmd);
     setTimeout(() => setCopiedCmd(null), 1500);
   };
