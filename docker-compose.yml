@@ -48,6 +48,7 @@ services:
     image: mysql:8.0
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
+      INSTANA_SERVICE_NAME: kafka-mysql
       MYSQL_ROOT_PASSWORD: ${DB_PASS:-paxp}
       MYSQL_DATABASE: ${DB_NAME:-kafka_test}
     ports:
@@ -123,6 +124,8 @@ services:
     build:
       context: ./kafka-frontend
       dockerfile: Dockerfile
+    environment:
+      INSTANA_SERVICE_NAME: kafka-frontend
     ports:
       - "80:80"
     depends_on:
