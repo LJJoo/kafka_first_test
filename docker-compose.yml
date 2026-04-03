@@ -17,7 +17,7 @@ services:
   # ── Infrastructure ─────────────────────────────────────────────────────────
 
   kafka:
-    image: bitnami/kafka:3.9
+    image: bitnami/kafka:3.9.0
     environment:
       # KRaft 모드 (Zookeeper 없음)
       KAFKA_CFG_NODE_ID: 1
