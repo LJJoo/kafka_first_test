@@ -1,5 +1,17 @@
 version: '3.8'
 
+# ── 실행 방법 ──────────────────────────────────────────────────────────────────
+# 기본 실행 (기본값 내장 — .env 없어도 동작):
+#   docker compose up --build
+#
+# 비밀번호 등 커스터마이징:
+#   cp .env.example .env  →  .env 편집  →  docker compose up --build
+#
+# ESXi VM 등 원격 서버 배포 시:
+#   .env 에 KAFKA_EXTERNAL_HOST=<서버 IP> 설정
+#   (CLI 패널에서 Bootstrap Server를 <서버IP>:29092 로 입력)
+# ──────────────────────────────────────────────────────────────────────────────
+
 services:
 
   # ── Infrastructure ─────────────────────────────────────────────────────────
@@ -21,7 +33,7 @@ services:
       KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_CFG_NUM_PARTITIONS: 3
     ports:
-      - "29092:29092"   # 호스트에서 CLI 실습 시 사용
+      - "29092:29092"   # 호스트에서 Kafka CLI 실습 시 사용
     volumes:
       - kafka-data:/bitnami/kafka
     healthcheck:
@@ -34,8 +46,8 @@ services:
   mysql:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASS}
-      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_ROOT_PASSWORD: ${DB_PASS:-paxp}
+      MYSQL_DATABASE: ${DB_NAME:-kafka_test}
     ports:
       - "3307:3306"   # 로컬 MySQL과 충돌 방지
     volumes:
@@ -64,10 +76,12 @@ services:
       context: ./kafka-test1
       dockerfile: Dockerfile
     environment:
+      # DB_HOST / KAFKA_HOST / REDIS_HOST 는 Docker 서비스명으로 고정
+      # (로컬 .env 의 DB_HOST=localhost 등과 충돌하지 않음)
       DB_HOST: mysql
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASS: ${DB_PASS}
+      DB_NAME: ${DB_NAME:-kafka_test}
+      DB_USER: ${DB_USER:-root}
+      DB_PASS: ${DB_PASS:-paxp}
       KAFKA_HOST: kafka
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -86,9 +100,9 @@ services:
       dockerfile: Dockerfile
     environment:
       DB_HOST: mysql
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASS: ${DB_PASS}
+      DB_NAME: ${DB_NAME:-kafka_test}
+      DB_USER: ${DB_USER:-root}
+      DB_PASS: ${DB_PASS:-paxp}
       KAFKA_HOST: kafka
     depends_on:
       kafka:

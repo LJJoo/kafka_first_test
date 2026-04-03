@@ -346,10 +346,9 @@ dev 에서 작업 → 커밋 → 완성 시 main 머지
 
 ---
 
-### Docker Compose 통합 배포
-> 로컬 개발 완료 후 전체 서비스를 Docker Compose로 묶어서 서버에 배포
+### Docker Compose 통합 배포 ✅ 구성 완료
 
-**배포 대상 서비스**
+**서비스 아키텍처**
 ```
 [브라우저]
     │
@@ -359,112 +358,111 @@ dev 에서 작업 → 커밋 → 완성 시 main 머지
     ├─ /api/producer/* → kafka-test1:8080
     └─ /api/consumer/* → kafka-test2:8081
 
-[kafka-test1:8080] ─── mysql:3306
-        │               redis:6379
-        └─ publish ──→ kafka:9092
+[kafka-test1:8080] ─── mysql:3307 (호스트 포트)
+        │               redis:6380 (호스트 포트)
+        └─ publish ──→ kafka:9092 (내부) / 29092 (CLI용 외부)
 
-[kafka-test2:8081] ─── mysql:3306
+[kafka-test2:8081] ─── mysql:3307
         └─ consume ──← kafka:9092
 
-[kafka:9092] ←── zookeeper:2181
-[mysql:3306]
-[redis:6379]
+[kafka:9092/29092] ← KRaft 모드 (Zookeeper 없음)
+[mysql:3306/3307]
+[redis:6379/6380]
 ```
 
-**로컬 → Docker 전환 전략**
-- 환경변수만 바꾸면 전환 완료 (코드 변경 없음)
-- 로컬: `REDIS_HOST=localhost`, `KAFKA_HOST=localhost`, `DB_HOST=localhost`
-- Docker: `REDIS_HOST=redis`, `KAFKA_HOST=kafka`, `DB_HOST=mysql` (서비스 이름이 호스트명)
-
-**환경변수 목록 (.env / .env.docker)**
-```bash
-# 공통
-DB_NAME=kafka_test
-DB_USER=root
-DB_PASS=paxp
-KAFKA_PORT=9092
-REDIS_PORT=6379
-
-# 로컬
-DB_HOST=localhost
-KAFKA_HOST=localhost
-REDIS_HOST=localhost
-
-# Docker (.env.docker)
-DB_HOST=mysql
-KAFKA_HOST=kafka
-REDIS_HOST=redis
-```
-
-**Docker Compose 구성 파일 목록**
+**Docker Compose 구성 파일**
 ```
 초기 테스트/
-├── docker-compose.yml
-├── .env.docker
+├── docker-compose.yml    ← 기본값 내장 — .env 없어도 바로 실행 가능
+├── .env.example          ← 커밋됨. 복사 후 .env 로 사용 (옵션)
+├── .env                  ← gitignore. IntelliJ 로컬 개발 + Docker 오버라이드 겸용
 ├── kafka-test1/
-│   └── Dockerfile
+│   ├── Dockerfile        ← eclipse-temurin:21 멀티스테이지
+│   └── .dockerignore
 ├── kafka-test2/
-│   └── Dockerfile
+│   ├── Dockerfile
+│   └── .dockerignore
 └── kafka-frontend/
-    ├── Dockerfile         ← nginx 멀티스테이지 빌드
-    └── nginx.conf         ← 프록시 설정 (vite.config.js 역할 대체)
+    ├── Dockerfile        ← node:20 빌드 → nginx:alpine 서빙
+    ├── nginx.conf        ← /api/producer/ → test1, /api/consumer/ → test2
+    └── .dockerignore
 ```
 
-**kafka-frontend/nginx.conf 역할**
-- 로컬: `vite.config.js`의 proxy가 CORS 우회
-- Docker: nginx가 동일한 역할 수행
-```nginx
-location /api/producer/ { proxy_pass http://kafka-test1:8080/; }
-location /api/consumer/ { proxy_pass http://kafka-test2:8081/; }
-```
+**환경변수 전략**
+- `docker-compose.yml`에 기본값 내장 (`${VAR:-default}` 형태)
+- `DB_HOST / KAFKA_HOST / REDIS_HOST`는 compose 내부에서 서비스명으로 고정 (`.env` 충돌 없음)
+- `.env`가 있으면 `DB_PASS`, `KAFKA_EXTERNAL_HOST` 등을 오버라이드
 
-**필요 작업**
-- [x] `kafka-test1/Dockerfile` 작성 (eclipse-temurin:21 멀티스테이지)
-- [x] `kafka-test2/Dockerfile` 작성 (eclipse-temurin:21 멀티스테이지)
-- [x] `kafka-frontend/Dockerfile` 작성 (node:20 빌드 → nginx:alpine 서빙)
-- [x] `kafka-frontend/nginx.conf` 작성 (`/api/producer/` → test1, `/api/consumer/` → test2)
-- [x] `docker-compose.yml` 작성 (kafka KRaft, redis, mysql, test1, test2, frontend)
-- [x] `.env.docker.example` 작성 (`.env.docker`는 gitignore)
-- [x] `orderApi.js` — 상대 경로로 변경 (`/api/producer`, `/api/consumer`)
-- [x] `vite.config.js` — prefix rewrite 프록시로 변경 (로컬 개발 호환)
-- [ ] 서버에서 `docker compose --env-file .env.docker up --build` 테스트
-
-**작업 순서**
-```
-1단계 (완료 ✅)
-  └─ Redis 로컬 설치
-  └─ Redis 버퍼 패턴 구현
-  └─ 3단계 상태 적용
-  └─ 통합 테스트
-
-2단계 (파일 작성 완료 ✅ → 서버 테스트 남음)
-  └─ 각 서비스 Dockerfile 작성 ✅
-  └─ docker-compose.yml 작성 ✅
-  └─ nginx.conf 작성 ✅
-  └─ .env.docker.example 작성 ✅
-  └─ orderApi.js 상대경로 전환 ✅
-  └─ docker compose --env-file .env.docker up --build  ← 남은 작업
-```
-
-**Docker 실행 방법**
-```bash
-# 1. .env.docker 파일 생성 (.env.docker.example 참고)
-cp .env.docker.example .env.docker
-# .env.docker 편집하여 실제 비밀번호 입력
-
-# 2. 빌드 및 실행
-docker compose --env-file .env.docker up --build
-
-# 3. 접속
-# 프론트엔드: http://localhost (또는 서버 IP)
-# Kafka CLI 실습: Bootstrap Server를 localhost:29092 로 변경
-
-# 4. 중지
-docker compose --env-file .env.docker down
-```
-
-**로컬 개발과 Docker의 API 라우팅 비교**
+**API 라우팅 (로컬 개발 ↔ Docker 동일)**
 | 환경 | Producer 경로 | Consumer 경로 |
 |------|--------------|--------------|
-| 로컬 (Vite proxy) | `/api/producer/...` → vite rewrite → `localhost:8080/...` | `/api/consumer/...` → vite rewrite → `localhost:8081/...` |
+| 로컬 개발 (Vite proxy) | `/api/producer/...` → rewrite → `localhost:8080/...` | `/api/consumer/...` → rewrite → `localhost:8081/...` |
 | Docker (nginx) | `/api/producer/...` → nginx → `kafka-test1:8080/...` | `/api/consumer/...` → nginx → `kafka-test2:8081/...` |
+
+**작업 완료 현황**
+- [x] `kafka-test1/Dockerfile` (eclipse-temurin:21 멀티스테이지)
+- [x] `kafka-test2/Dockerfile`
+- [x] `kafka-frontend/Dockerfile` (node:20 빌드 → nginx:alpine)
+- [x] `kafka-frontend/nginx.conf`
+- [x] `docker-compose.yml` (기본값 내장, `.env` 없이 실행 가능)
+- [x] `.env.example` (IntelliJ + Docker 겸용 설명)
+- [x] `orderApi.js` 상대경로 전환 (`/api/producer`, `/api/consumer`)
+- [x] `vite.config.js` prefix rewrite 프록시
+- [ ] ESXi VM에서 `docker compose up --build` 테스트
+
+---
+
+## Docker Compose 실행 가이드
+
+### 로컬 (바로 실행)
+```bash
+# git clone 후 즉시 실행 가능 — .env 없어도 기본값으로 동작
+docker compose up --build
+
+# 접속
+# 프론트엔드:    http://localhost
+# Kafka CLI:    Bootstrap Server → localhost:29092
+
+# 중지
+docker compose down
+```
+
+### ESXi VM 배포
+
+```bash
+# 1. GitHub에서 클론
+git clone <repo-url>
+cd <repo-dir>
+
+# 2. .env 생성 (비밀번호 변경 또는 KAFKA_EXTERNAL_HOST 설정 시)
+cp .env.example .env
+# .env 편집:
+#   DB_PASS=실제비밀번호
+#   KAFKA_EXTERNAL_HOST=VM의IP   ← CLI 패널에서 외부 접속 시 필요
+
+# 3. 빌드 및 실행
+docker compose up --build -d
+
+# 4. 접속
+# 프론트엔드:    http://<VM-IP>
+# Kafka CLI:    Bootstrap Server → <VM-IP>:29092
+
+# 5. 로그 확인
+docker compose logs -f kafka-test1
+docker compose logs -f kafka-test2
+
+# 6. 중지
+docker compose down
+```
+
+### 유용한 명령어
+```bash
+# 특정 서비스만 재빌드
+docker compose up --build kafka-test1
+
+# 컨테이너 상태 확인
+docker compose ps
+
+# 볼륨까지 삭제 (DB 초기화)
+docker compose down -v
+```
