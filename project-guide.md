@@ -301,7 +301,7 @@ dev 에서 작업 → 커밋 → 완성 시 main 머지
   - [x] Kafka CLI 실습 패널 (오른쪽 사이드바)
     - [x] 2컬럼 레이아웃 (메인 콘텐츠 + 우측 sticky 패널)
     - [x] Bootstrap Server 입력창 — 실시간으로 모든 명령어 주소 반영
-    - [x] 카테고리별 명령어 (토픽 확인 / 메시지 구독 / 직접 발행 / LAG 확인 / Offset 리셋)
+    - [x] 카테고리별 탭 네비게이션 (9개 탭: 토픽 확인/관리, 구독, 발행, 파티션 분산, LAG, Rebalancing, Offset 리셋, 성능 테스트)
     - [x] 복사 버튼 — 클릭 시 1.5초간 "복사됨" 표시
     - [x] 다크 테마 코드블록, 1100px 이하 반응형 처리
 - [x] Redis 버퍼 패턴 구현 (1단계 완료)
@@ -419,27 +419,52 @@ location /api/consumer/ { proxy_pass http://kafka-test2:8081/; }
 ```
 
 **필요 작업**
-- [ ] `kafka-test1/Dockerfile` 작성
-- [ ] `kafka-test2/Dockerfile` 작성
-- [ ] `kafka-frontend/Dockerfile` 작성 (nginx 멀티스테이지)
-- [ ] `kafka-frontend/nginx.conf` 작성
-- [ ] `docker-compose.yml` 작성 (zookeeper, kafka, redis, mysql, test1, test2, frontend)
-- [ ] `.env.docker` 작성
-- [ ] `application.yaml`에 `REDIS_PORT` 환경변수 적용 확인
+- [x] `kafka-test1/Dockerfile` 작성 (eclipse-temurin:21 멀티스테이지)
+- [x] `kafka-test2/Dockerfile` 작성 (eclipse-temurin:21 멀티스테이지)
+- [x] `kafka-frontend/Dockerfile` 작성 (node:20 빌드 → nginx:alpine 서빙)
+- [x] `kafka-frontend/nginx.conf` 작성 (`/api/producer/` → test1, `/api/consumer/` → test2)
+- [x] `docker-compose.yml` 작성 (kafka KRaft, redis, mysql, test1, test2, frontend)
+- [x] `.env.docker.example` 작성 (`.env.docker`는 gitignore)
+- [x] `orderApi.js` — 상대 경로로 변경 (`/api/producer`, `/api/consumer`)
+- [x] `vite.config.js` — prefix rewrite 프록시로 변경 (로컬 개발 호환)
 - [ ] 서버에서 `docker compose --env-file .env.docker up --build` 테스트
 
 **작업 순서**
 ```
-1단계 (지금 — 로컬)
+1단계 (완료 ✅)
   └─ Redis 로컬 설치
   └─ Redis 버퍼 패턴 구현
   └─ 3단계 상태 적용
   └─ 통합 테스트
 
-2단계 (배포)
-  └─ 각 서비스 Dockerfile 작성
-  └─ docker-compose.yml 작성
-  └─ nginx.conf 작성
-  └─ .env.docker 작성
-  └─ docker compose up --build
+2단계 (파일 작성 완료 ✅ → 서버 테스트 남음)
+  └─ 각 서비스 Dockerfile 작성 ✅
+  └─ docker-compose.yml 작성 ✅
+  └─ nginx.conf 작성 ✅
+  └─ .env.docker.example 작성 ✅
+  └─ orderApi.js 상대경로 전환 ✅
+  └─ docker compose --env-file .env.docker up --build  ← 남은 작업
 ```
+
+**Docker 실행 방법**
+```bash
+# 1. .env.docker 파일 생성 (.env.docker.example 참고)
+cp .env.docker.example .env.docker
+# .env.docker 편집하여 실제 비밀번호 입력
+
+# 2. 빌드 및 실행
+docker compose --env-file .env.docker up --build
+
+# 3. 접속
+# 프론트엔드: http://localhost (또는 서버 IP)
+# Kafka CLI 실습: Bootstrap Server를 localhost:29092 로 변경
+
+# 4. 중지
+docker compose --env-file .env.docker down
+```
+
+**로컬 개발과 Docker의 API 라우팅 비교**
+| 환경 | Producer 경로 | Consumer 경로 |
+|------|--------------|--------------|
+| 로컬 (Vite proxy) | `/api/producer/...` → vite rewrite → `localhost:8080/...` | `/api/consumer/...` → vite rewrite → `localhost:8081/...` |
+| Docker (nginx) | `/api/producer/...` → nginx → `kafka-test1:8080/...` | `/api/consumer/...` → nginx → `kafka-test2:8081/...` |

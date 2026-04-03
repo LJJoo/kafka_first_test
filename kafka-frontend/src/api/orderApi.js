@@ -1,7 +1,9 @@
 import axios from 'axios';
 
-const producer = axios.create({ baseURL: 'http://localhost:8080' });
-const consumer = axios.create({ baseURL: 'http://localhost:8081' });
+// 로컬 개발: vite.config.js proxy가 /api/producer → 8080, /api/consumer → 8081 로 라우팅
+// Docker:   nginx가 동일한 역할 수행 (nginx.conf 참고)
+const producer = axios.create({ baseURL: '/api/producer' });
+const consumer = axios.create({ baseURL: '/api/consumer' });
 
 export const createOrder = (data) => producer.post('/api/order', data);
 export const getProducerOrders = () => producer.get('/api/orders');
