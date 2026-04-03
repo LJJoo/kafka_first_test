@@ -332,6 +332,41 @@ td {
   text-align: center;
 }
 
+/* CLI 탭 */
+.cli-tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #313244;
+}
+
+.cli-tab {
+  padding: 4px 10px;
+  background: #313244;
+  color: #a6adc8;
+  border: 1px solid #45475a;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: normal;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.cli-tab:hover:not(.active) {
+  background: #45475a;
+  color: #cdd6f4;
+}
+
+.cli-tab.active {
+  background: #89b4fa;
+  color: #1e1e2e;
+  border-color: #89b4fa;
+  font-weight: bold;
+}
+
 /* Kafka CLI 실습 패널 */
 .cmd-panel {
   position: sticky;

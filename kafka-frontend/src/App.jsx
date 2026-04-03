@@ -28,6 +28,27 @@ const getKafkaCommands = (server) => [
     ],
   },
   {
+    category: '토픽 관리',
+    items: [
+      {
+        label: '토픽 생성 (파티션 3, 복제 1)',
+        cmd: `bin/kafka-topics.sh --bootstrap-server ${server} --create --topic test-topic --partitions 3 --replication-factor 1`,
+      },
+      {
+        label: 'Retention 시간 변경 (1분)',
+        cmd: `bin/kafka-configs.sh --bootstrap-server ${server} --entity-type topics --entity-name order-events --alter --add-config retention.ms=60000`,
+      },
+      {
+        label: '토픽 설정 확인',
+        cmd: `bin/kafka-configs.sh --bootstrap-server ${server} --entity-type topics --entity-name order-events --describe`,
+      },
+      {
+        label: '토픽 삭제',
+        cmd: `bin/kafka-topics.sh --bootstrap-server ${server} --delete --topic test-topic`,
+      },
+    ],
+  },
+  {
     category: '메시지 구독',
     items: [
       {
@@ -43,8 +64,12 @@ const getKafkaCommands = (server) => [
         cmd: `bin/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --partition 0 --from-beginning`,
       },
       {
-        label: 'Key 포함 출력',
-        cmd: `bin/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --from-beginning --property print.key=true`,
+        label: 'Key + 타임스탬프 포함 출력',
+        cmd: `bin/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --from-beginning --property print.key=true --property print.timestamp=true`,
+      },
+      {
+        label: 'N개만 읽고 종료',
+        cmd: `bin/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --from-beginning --max-messages 5`,
       },
     ],
   },
@@ -62,6 +87,19 @@ const getKafkaCommands = (server) => [
     ],
   },
   {
+    category: '파티션 분산 확인',
+    items: [
+      {
+        label: '파티션별 최신 offset',
+        cmd: `bin/kafka-run-class.sh kafka.tools.GetOffsetShell --broker-list ${server} --topic order-events --time -1`,
+      },
+      {
+        label: '파티션별 최초 offset',
+        cmd: `bin/kafka-run-class.sh kafka.tools.GetOffsetShell --broker-list ${server} --topic order-events --time -2`,
+      },
+    ],
+  },
+  {
     category: 'Consumer Group / LAG',
     items: [
       {
@@ -71,6 +109,23 @@ const getKafkaCommands = (server) => [
       {
         label: 'LAG 상세 조회',
         cmd: `bin/kafka-consumer-groups.sh --bootstrap-server ${server} --describe --group order-group`,
+      },
+      {
+        label: '독립 Group으로 처음부터 소비',
+        cmd: `bin/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --group new-group --from-beginning`,
+      },
+    ],
+  },
+  {
+    category: 'Rebalancing 실습',
+    items: [
+      {
+        label: '터미널 1 — Consumer A 실행',
+        cmd: `bin/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --group order-group`,
+      },
+      {
+        label: '터미널 2 — Consumer B 실행 (파티션 재분배)',
+        cmd: `bin/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --group order-group`,
       },
     ],
   },
@@ -84,6 +139,23 @@ const getKafkaCommands = (server) => [
       {
         label: 'Offset 지정 이동',
         cmd: `bin/kafka-consumer-groups.sh --bootstrap-server ${server} --group order-group --topic order-events --reset-offsets --to-offset 5 --execute`,
+      },
+      {
+        label: '특정 시점부터 재처리',
+        cmd: `bin/kafka-consumer-groups.sh --bootstrap-server ${server} --group order-group --topic order-events --reset-offsets --to-datetime 2026-04-03T00:00:00.000 --execute`,
+      },
+    ],
+  },
+  {
+    category: '성능 테스트',
+    items: [
+      {
+        label: 'Producer 처리량 측정 (1000건)',
+        cmd: `bin/kafka-producer-perf-test.sh --topic order-events --num-records 1000 --record-size 100 --throughput -1 --producer-props bootstrap.servers=${server}`,
+      },
+      {
+        label: 'Consumer 처리량 측정',
+        cmd: `bin/kafka-consumer-perf-test.sh --bootstrap-server ${server} --topic order-events --messages 1000 --group perf-group`,
       },
     ],
   },
@@ -125,6 +197,7 @@ function App() {
   const [consumerPage, setConsumerPage] = useState(1);
   const [copiedCmd, setCopiedCmd] = useState(null);
   const [bootstrapServer, setBootstrapServer] = useState(DEFAULT_BOOTSTRAP);
+  const [activeCliTab, setActiveCliTab] = useState(0);
   const kafkaCommands = getKafkaCommands(bootstrapServer);
   const intervalRef = useRef(null);
 
@@ -446,23 +519,33 @@ function App() {
             spellCheck={false}
           />
         </div>
-        {kafkaCommands.map((cat) => (
-          <div key={cat.category} className="cmd-category">
-            <div className="cmd-category-title">{cat.category}</div>
-            {cat.items.map((item) => (
-              <div key={item.cmd} className="cmd-item">
-                <div className="cmd-label">{item.label}</div>
-                <div className="cmd-row">
-                  <code className="cmd-code">{item.cmd}</code>
-                  <button
-                    className={`btn-copy ${copiedCmd === item.cmd ? 'copied' : ''}`}
-                    onClick={() => handleCopy(item.cmd)}
-                  >
-                    {copiedCmd === item.cmd ? '복사됨' : '복사'}
-                  </button>
-                </div>
-              </div>
-            ))}
+
+        {/* 카테고리 탭 */}
+        <div className="cli-tab-bar">
+          {kafkaCommands.map((cat, i) => (
+            <button
+              key={cat.category}
+              className={`cli-tab ${activeCliTab === i ? 'active' : ''}`}
+              onClick={() => setActiveCliTab(i)}
+            >
+              {cat.category}
+            </button>
+          ))}
+        </div>
+
+        {/* 현재 탭 명령어 */}
+        {kafkaCommands[activeCliTab]?.items.map((item) => (
+          <div key={item.cmd} className="cmd-item">
+            <div className="cmd-label">{item.label}</div>
+            <div className="cmd-row">
+              <code className="cmd-code">{item.cmd}</code>
+              <button
+                className={`btn-copy ${copiedCmd === item.cmd ? 'copied' : ''}`}
+                onClick={() => handleCopy(item.cmd)}
+              >
+                {copiedCmd === item.cmd ? '복사됨' : '복사'}
+              </button>
+            </div>
           </div>
         ))}
       </aside>
