@@ -11,7 +11,9 @@ const RANDOM_PRODUCTS = ['사과', '바나나', '노트북', '마우스', '키�
 const PAGE_SIZE = 10;
 const STATUS_TABS = ['전체', 'PENDING', 'KAFKA_SENT', 'PROCESSED', 'FAILED'];
 
-const DEFAULT_BOOTSTRAP = '192.168.153.128:9092';
+const DEFAULT_BOOTSTRAP = 'localhost:9092';
+const DOCKER_EXEC = 'docker compose exec kafka';
+const KAFKA_BIN = '/opt/kafka/bin';
 
 const getKafkaCommands = (server) => [
   {
@@ -19,11 +21,11 @@ const getKafkaCommands = (server) => [
     items: [
       {
         label: '토픽 목록',
-        cmd: `bin/kafka-topics.sh --bootstrap-server ${server} --list`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-topics.sh --bootstrap-server ${server} --list`,
       },
       {
         label: '토픽 상세 (파티션 / 리더)',
-        cmd: `bin/kafka-topics.sh --bootstrap-server ${server} --describe --topic order-events`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-topics.sh --bootstrap-server ${server} --describe --topic order-events`,
       },
     ],
   },
@@ -32,19 +34,19 @@ const getKafkaCommands = (server) => [
     items: [
       {
         label: '토픽 생성 (파티션 3, 복제 1)',
-        cmd: `bin/kafka-topics.sh --bootstrap-server ${server} --create --topic test-topic --partitions 3 --replication-factor 1`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-topics.sh --bootstrap-server ${server} --create --topic test-topic --partitions 3 --replication-factor 1`,
       },
       {
         label: 'Retention 시간 변경 (1분)',
-        cmd: `bin/kafka-configs.sh --bootstrap-server ${server} --entity-type topics --entity-name order-events --alter --add-config retention.ms=60000`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-configs.sh --bootstrap-server ${server} --entity-type topics --entity-name order-events --alter --add-config retention.ms=60000`,
       },
       {
         label: '토픽 설정 확인',
-        cmd: `bin/kafka-configs.sh --bootstrap-server ${server} --entity-type topics --entity-name order-events --describe`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-configs.sh --bootstrap-server ${server} --entity-type topics --entity-name order-events --describe`,
       },
       {
         label: '토픽 삭제',
-        cmd: `bin/kafka-topics.sh --bootstrap-server ${server} --delete --topic test-topic`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-topics.sh --bootstrap-server ${server} --delete --topic test-topic`,
       },
     ],
   },
@@ -53,23 +55,23 @@ const getKafkaCommands = (server) => [
     items: [
       {
         label: '실시간 수신',
-        cmd: `bin/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events`,
       },
       {
         label: '처음부터 전체 수신',
-        cmd: `bin/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --from-beginning`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --from-beginning`,
       },
       {
         label: '파티션 0만 수신',
-        cmd: `bin/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --partition 0 --from-beginning`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --partition 0 --from-beginning`,
       },
       {
         label: 'Key + 타임스탬프 포함 출력',
-        cmd: `bin/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --from-beginning --property print.key=true --property print.timestamp=true`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --from-beginning --property print.key=true --property print.timestamp=true`,
       },
       {
         label: 'N개만 읽고 종료',
-        cmd: `bin/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --from-beginning --max-messages 5`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --from-beginning --max-messages 5`,
       },
     ],
   },
@@ -78,11 +80,11 @@ const getKafkaCommands = (server) => [
     items: [
       {
         label: '직접 발행',
-        cmd: `bin/kafka-console-producer.sh --bootstrap-server ${server} --topic order-events`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-console-producer.sh --bootstrap-server ${server} --topic order-events`,
       },
       {
         label: 'Key 지정 발행',
-        cmd: `bin/kafka-console-producer.sh --bootstrap-server ${server} --topic order-events --property "key.separator=:" --property "parse.key=true"`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-console-producer.sh --bootstrap-server ${server} --topic order-events --property "key.separator=:" --property "parse.key=true"`,
       },
     ],
   },
@@ -91,11 +93,11 @@ const getKafkaCommands = (server) => [
     items: [
       {
         label: '파티션별 최신 offset',
-        cmd: `bin/kafka-run-class.sh kafka.tools.GetOffsetShell --broker-list ${server} --topic order-events --time -1`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-get-offsets.sh --bootstrap-server ${server} --topic order-events --time latest`,
       },
       {
         label: '파티션별 최초 offset',
-        cmd: `bin/kafka-run-class.sh kafka.tools.GetOffsetShell --broker-list ${server} --topic order-events --time -2`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-get-offsets.sh --bootstrap-server ${server} --topic order-events --time earliest`,
       },
     ],
   },
@@ -104,15 +106,15 @@ const getKafkaCommands = (server) => [
     items: [
       {
         label: 'Group 목록',
-        cmd: `bin/kafka-consumer-groups.sh --bootstrap-server ${server} --list`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-consumer-groups.sh --bootstrap-server ${server} --list`,
       },
       {
         label: 'LAG 상세 조회',
-        cmd: `bin/kafka-consumer-groups.sh --bootstrap-server ${server} --describe --group order-group`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-consumer-groups.sh --bootstrap-server ${server} --describe --group order-group`,
       },
       {
         label: '독립 Group으로 처음부터 소비',
-        cmd: `bin/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --group new-group --from-beginning`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --group new-group --from-beginning`,
       },
     ],
   },
@@ -121,11 +123,11 @@ const getKafkaCommands = (server) => [
     items: [
       {
         label: '터미널 1 — Consumer A 실행',
-        cmd: `bin/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --group order-group`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --group order-group`,
       },
       {
         label: '터미널 2 — Consumer B 실행 (파티션 재분배)',
-        cmd: `bin/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --group order-group`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-console-consumer.sh --bootstrap-server ${server} --topic order-events --group order-group`,
       },
     ],
   },
@@ -134,15 +136,15 @@ const getKafkaCommands = (server) => [
     items: [
       {
         label: '처음부터 재처리',
-        cmd: `bin/kafka-consumer-groups.sh --bootstrap-server ${server} --group order-group --topic order-events --reset-offsets --to-earliest --execute`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-consumer-groups.sh --bootstrap-server ${server} --group order-group --topic order-events --reset-offsets --to-earliest --execute`,
       },
       {
         label: 'Offset 지정 이동',
-        cmd: `bin/kafka-consumer-groups.sh --bootstrap-server ${server} --group order-group --topic order-events --reset-offsets --to-offset 5 --execute`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-consumer-groups.sh --bootstrap-server ${server} --group order-group --topic order-events --reset-offsets --to-offset 5 --execute`,
       },
       {
         label: '특정 시점부터 재처리',
-        cmd: `bin/kafka-consumer-groups.sh --bootstrap-server ${server} --group order-group --topic order-events --reset-offsets --to-datetime 2026-04-03T00:00:00.000 --execute`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-consumer-groups.sh --bootstrap-server ${server} --group order-group --topic order-events --reset-offsets --to-datetime 2026-04-03T00:00:00.000 --execute`,
       },
     ],
   },
@@ -151,11 +153,11 @@ const getKafkaCommands = (server) => [
     items: [
       {
         label: 'Producer 처리량 측정 (1000건)',
-        cmd: `bin/kafka-producer-perf-test.sh --topic order-events --num-records 1000 --record-size 100 --throughput -1 --producer-props bootstrap.servers=${server}`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-producer-perf-test.sh --topic order-events --num-records 1000 --record-size 100 --throughput -1 --producer-props bootstrap.servers=${server}`,
       },
       {
         label: 'Consumer 처리량 측정',
-        cmd: `bin/kafka-consumer-perf-test.sh --bootstrap-server ${server} --topic order-events --messages 1000 --group perf-group`,
+        cmd: `${DOCKER_EXEC} ${KAFKA_BIN}/kafka-consumer-perf-test.sh --bootstrap-server ${server} --topic order-events --messages 1000 --group perf-group`,
       },
     ],
   },
@@ -508,7 +510,7 @@ function App() {
       {/* ── 오른쪽: Kafka CLI 실습 패널 ── */}
       <aside className="cmd-panel">
         <div className="cmd-panel-title">Kafka CLI 실습</div>
-        <div className="cmd-panel-desc">VM에서 Kafka 설치 디렉토리 기준으로 실행</div>
+        <div className="cmd-panel-desc">docker-compose.yml 위치에서 실행 (Bootstrap Server: localhost:9092)</div>
         <div className="server-input-row">
           <label className="server-label">Bootstrap Server</label>
           <input
