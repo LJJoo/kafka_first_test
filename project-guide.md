@@ -430,6 +430,20 @@ dev 에서 작업 → 커밋 → 완성 시 main 머지
 
 ---
 
+### Docker Compose VM 배포 중 발견된 버그 및 수정 내역 (2026-04-03)
+
+| # | 파일 | 문제 | 수정 내용 |
+|---|------|------|----------|
+| 3 | `kafka-test1/Dockerfile`, `kafka-test2/Dockerfile` | 빌드 컨텍스트가 `kafka-testN/` 폴더인데 `COPY kafka-testN/ .`로 써야 내부 소스 복사 가능. `COPY . .`로 잘못 수정 후 원복 | `COPY kafka-testN/ .` 유지 (컨텍스트 내 동명 하위 폴더 구조) |
+| 4 | `kafka-test1/application.yaml`, `kafka-test2/application.yaml` | MySQL 8.0 기본 인증 플러그인 `caching_sha2_password`가 `useSSL=false` 환경에서 RSA 공개키 교환 필요 → JDBC 연결 실패 → Hibernate Dialect 결정 불가 → 앱 기동 실패 (exit code 1) | JDBC URL에 `allowPublicKeyRetrieval=true` 추가 |
+| 5 | `docker-compose.yml`, `kafka-test1/application.yaml`, `kafka-test2/application.yaml` | MySQL 컨테이너 기본 charset이 `latin1`이라 한글 데이터가 `???`로 저장됨 | `docker-compose.yml` MySQL 서비스에 `--character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci` 추가, JDBC URL에 `characterEncoding=UTF-8&useUnicode=true` 추가 |
+| 6 | `kafka-test1/OrderProducer.java` | `kafkaTemplate.send()`가 비동기라 Kafka 전송 실패 시에도 DB 상태가 `KAFKA_SENT`로 찍히는 문제 | `.get()` 추가로 broker ack 대기 후 상태 업데이트 |
+| 7 | `kafka-test1/OrderProducer.java` | `kafkaTemplate.send().get()` 이후 `KAFKA_SENT`를 DB에 쓰는 구조에서 그 사이에 consumer가 이미 `PROCESSED`로 업데이트 완료 → producer가 `KAFKA_SENT`로 덮어쓰는 race condition | DB를 `KAFKA_SENT`로 **먼저** 업데이트 → Kafka 전송 → 전송 실패 시 `PENDING`으로 롤백 |
+| 8 | `kafka-frontend/src/App.jsx` | Kafka CLI 패널 명령어가 `bin/kafka-topics.sh` 상대경로 + 기존 VM IP 기반이라 Docker 환경에서 동작 안 함 | 모든 명령어에 `docker compose exec kafka` prefix 추가, 경로를 `/opt/kafka/bin/`으로 변경, Bootstrap Server 기본값을 `localhost:9092`로 수정, `kafka-run-class.sh`(deprecated) → `kafka-get-offsets.sh`로 교체 |
+| 9 | `kafka-frontend/src/App.jsx` | `navigator.clipboard`는 HTTPS/localhost에서만 동작 — HTTP로 VM에 접속 시 복사 버튼 미작동 | `window.isSecureContext` 체크 후 `document.execCommand('copy')` fallback 추가 |
+
+---
+
 ## 이후 진행 예정
 
 ### ~~Redis 버퍼 패턴 구현~~ ✅ 완료
@@ -538,7 +552,12 @@ localhost:29092        ← 로컬
 - [x] `.env.example` (IntelliJ + Docker 겸용 설명)
 - [x] `orderApi.js` 상대경로 전환 (`/api/producer`, `/api/consumer`)
 - [x] `vite.config.js` prefix rewrite 프록시
-- [ ] ESXi VM에서 `docker compose up --build` 테스트
+- [x] ESXi VM에서 `docker compose up --build` 테스트 완료
+- [x] MySQL `allowPublicKeyRetrieval=true` (caching_sha2_password 인증 오류 수정)
+- [x] MySQL `utf8mb4` charset 설정 (한글 깨짐 수정)
+- [x] `OrderProducer.java` Kafka 전송 동기화 + race condition 수정
+- [x] Kafka CLI 패널 Docker 명령어 적용 (`docker compose exec kafka /opt/kafka/bin/`)
+- [x] 클립보드 복사 HTTP fallback (`execCommand` 방식)
 
 ---
 
