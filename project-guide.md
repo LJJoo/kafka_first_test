@@ -4,6 +4,102 @@
 
 ---
 
+## 실행 방법
+
+### Docker Compose (권장 — 로컬 / ESXi VM 공통)
+
+```bash
+# 1. 저장소 클론
+git clone https://github.com/LJJoo/kafka_first_test.git
+cd kafka_first_test
+
+# 2. (선택) 비밀번호 변경 또는 VM 배포 시에만 .env 생성
+cp .env.example .env
+# 편집 항목:
+#   DB_PASS=실제비밀번호
+#   KAFKA_EXTERNAL_HOST=<VM IP>   ← ESXi VM 배포 시 CLI 패널 외부 접속용
+
+# 3. 빌드 및 백그라운드 실행
+docker compose up --build -d
+
+# 4. 접속
+# 프론트엔드:  http://localhost          (로컬)
+#             http://<VM-IP>            (ESXi VM)
+# Kafka CLI 패널 Bootstrap Server:
+#   localhost:29092                     (로컬)
+#   <VM-IP>:29092                       (ESXi VM)
+
+# 5. 중지
+docker compose down
+
+# 볼륨까지 삭제 (DB 초기화 포함)
+docker compose down -v
+```
+
+> `.env` 파일이 없어도 `docker-compose.yml` 내부 기본값으로 동작합니다.
+
+---
+
+### 로컬 개발 (IntelliJ + npm dev)
+
+**사전 준비**
+- Java 21, Gradle, Node.js
+- MySQL 8.0, Redis (로컬 설치)
+- Kafka VM 또는 로컬 Kafka 브로커
+
+**1. `.env` 파일 생성** (프로젝트 루트)
+```bash
+cp .env.example .env
+# DB_HOST=localhost
+# DB_NAME=kafka_test
+# DB_USER=root
+# DB_PASS=실제비밀번호
+# KAFKA_HOST=192.168.x.x   ← Kafka VM IP
+# REDIS_HOST=localhost
+# REDIS_PORT=6379
+```
+
+**2. IntelliJ 환경변수 설정**
+```
+Run/Debug Configurations → Environment variables
+→ EnvFile 플러그인 사용 시 .env 파일 경로 지정
+```
+
+**3. 서버 실행**
+```bash
+# kafka-test1 (Producer, 포트 8080) — IntelliJ에서 실행
+# kafka-test2 (Consumer, 포트 8081) — IntelliJ에서 실행
+
+# 프론트엔드 (포트 5173)
+cd kafka-frontend
+npm install
+npm run dev
+```
+
+**4. 접속**: `http://localhost:5173`
+
+---
+
+### 유용한 Docker 명령어
+
+```bash
+# 서비스 상태 확인
+docker compose ps
+
+# 실시간 로그
+docker compose logs -f
+docker compose logs -f kafka-test1    # 특정 서비스만
+
+# 특정 서비스만 재빌드
+docker compose up --build kafka-test1 -d
+
+# 컨테이너 내부 접속
+docker compose exec kafka-test1 bash
+docker compose exec mysql mysql -u root -p
+```
+
+---
+
 ## 프로젝트 전체 구조
 
 ```
@@ -171,31 +267,29 @@ FAILED    → test2 처리 실패
 ## 환경변수 설정
 
 application.yaml은 모든 민감 정보를 환경변수로 관리합니다.
-`.env` 파일은 gitignore에 포함되어 있으므로 직접 생성해서 사용합니다.
 
-**.env.example 참고하여 .env 파일 생성**
+| 변수명 | 로컬 개발 | Docker Compose |
+|--------|----------|----------------|
+| `DB_HOST` | `localhost` | `mysql` (고정, .env 무시) |
+| `DB_NAME` | `kafka_test` | `kafka_test` |
+| `DB_USER` | `root` | `root` |
+| `DB_PASS` | 실제 비밀번호 | 실제 비밀번호 |
+| `KAFKA_HOST` | VM IP | `kafka` (고정, .env 무시) |
+| `REDIS_HOST` | `localhost` | `redis` (고정, .env 무시) |
+| `REDIS_PORT` | `6379` | `6379` |
+| `KAFKA_EXTERNAL_HOST` | 해당 없음 | `localhost` / VM IP |
+
+> Docker Compose에서 `DB_HOST / KAFKA_HOST / REDIS_HOST`는 서비스명으로 고정되므로
+> `.env`에 다른 값을 써도 무시됩니다. 하나의 `.env`로 로컬 개발과 Docker 모두 사용 가능합니다.
+
+**.env 파일 생성** (`.env.example` 복사)
 ```bash
-# 초기 테스트/ 루트에 .env 파일 생성
-DB_HOST=localhost
-DB_NAME=kafka_test
-DB_USER=root
-DB_PASS=paxp
-
-KAFKA_HOST=localhost   # VM 연결 시 VM의 IP로 변경
-
-REDIS_HOST=localhost   # Docker 배포 시 redis로 변경
-REDIS_PORT=6379
-```
-
-**IDE(IntelliJ)에서 환경변수 설정하는 방법**
-```
-Run/Debug Configurations → Environment variables 항목에 위 변수들 입력
-또는 EnvFile 플러그인 사용 시 .env 파일 경로 지정
+cp .env.example .env
 ```
 
 **주의사항**
-- `.env` 파일은 절대 커밋하지 않음
-- `.env.example`만 커밋 (실제 값 없이 키만 명시)
+- `.env` 파일은 절대 커밋하지 않음 (gitignore 등록됨)
+- `.env.example`만 커밋
 - 새로운 환경변수 추가 시 `.env.example`과 이 문서에 반드시 반영
 
 ---
