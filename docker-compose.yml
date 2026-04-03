@@ -19,6 +19,7 @@ services:
   kafka:
     image: apache/kafka:3.9.0
     environment:
+      INSTANA_SERVICE_NAME: kafka-broker
       # KRaft 모드 (Zookeeper 없음)
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -62,6 +63,8 @@ services:
 
   redis:
     image: redis:7-alpine
+    environment:
+      INSTANA_SERVICE_NAME: kafka-redis
     ports:
       - "6380:6379"   # 로컬 Redis와 충돌 방지
     healthcheck:
