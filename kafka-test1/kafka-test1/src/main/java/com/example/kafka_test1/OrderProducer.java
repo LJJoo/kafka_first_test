@@ -69,7 +69,7 @@ public class OrderProducer {
 
     private void sendToKafka(String json, long orderId) {
         try {
-            kafkaTemplate.send(TOPIC, String.valueOf(orderId), json);
+            kafkaTemplate.send(TOPIC, String.valueOf(orderId), json).get();
             orderRepo.findById(orderId).ifPresent(o -> {
                 o.setStatus("KAFKA_SENT");
                 orderRepo.save(o);
