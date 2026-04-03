@@ -68,15 +68,19 @@ public class OrderProducer {
     }
 
     private void sendToKafka(String json, long orderId) {
+        orderRepo.findById(orderId).ifPresent(o -> {
+            o.setStatus("KAFKA_SENT");
+            orderRepo.save(o);
+        });
         try {
             kafkaTemplate.send(TOPIC, String.valueOf(orderId), json).get();
-            orderRepo.findById(orderId).ifPresent(o -> {
-                o.setStatus("KAFKA_SENT");
-                orderRepo.save(o);
-            });
             logger.info("sent to kafka orderId {}", orderId);
         } catch (Exception e) {
-            logger.warn("kafka send failed orderId {}", orderId, e);
+            logger.warn("kafka send failed orderId {}, reverting to PENDING", orderId, e);
+            orderRepo.findById(orderId).ifPresent(o -> {
+                o.setStatus("PENDING");
+                orderRepo.save(o);
+            });
         }
     }
 }
