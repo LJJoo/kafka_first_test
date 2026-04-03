@@ -445,23 +445,59 @@ dev 에서 작업 → 커밋 → 완성 시 main 머지
 **서비스 아키텍처**
 ```
 [브라우저]
-    │
+    │  http://VM-IP:80
     ▼
-[nginx:80] ── kafka-frontend (React 빌드 결과물 서빙)
+[kafka-frontend]  nginx (React 앱 서빙 + API 프록시)
     │
-    ├─ /api/producer/* → kafka-test1:8080
-    └─ /api/consumer/* → kafka-test2:8081
+    ├── /api/producer/* ──→ [kafka-test1:8080]  Spring Boot Producer
+    │                            │
+    │                            ├── [mysql:3306]   주문 저장
+    │                            ├── [redis:6379]   버퍼 저장
+    │                            └── publish ──→ [kafka:9092]
+    │
+    └── /api/consumer/* ──→ [kafka-test2:8081]  Spring Boot Consumer
+                                 │
+                                 ├── [mysql:3306]   처리 결과 저장
+                                 └── consume ←── [kafka:9092]
+```
 
-[kafka-test1:8080] ─── mysql:3307 (호스트 포트)
-        │               redis:6380 (호스트 포트)
-        └─ publish ──→ kafka:9092 (내부) / 29092 (CLI용 외부)
+> kafka-test1/2 는 외부에 직접 노출되지 않음. 반드시 nginx를 통해서만 접근
 
-[kafka-test2:8081] ─── mysql:3307
-        └─ consume ──← kafka:9092
+**포트 정리**
 
-[kafka:9092/29092] ← KRaft 모드 (Zookeeper 없음)
-[mysql:3306/3307]
-[redis:6379/6380]
+| 서비스 | 내부 포트 | 호스트 노출 포트 | 용도 |
+|--------|----------|----------------|------|
+| kafka-frontend | 80 | **80** | 웹 접속 |
+| kafka | 9092 | 없음 | 내부 서비스 간 통신 |
+| kafka | 29092 | **29092** | CLI 실습 외부 접속 |
+| mysql | 3306 | 3307 | 로컬 MySQL 충돌 방지 |
+| redis | 6379 | 6380 | 로컬 Redis 충돌 방지 |
+| kafka-test1 | 8080 | 없음 | nginx 프록시로만 접근 |
+| kafka-test2 | 8081 | 없음 | nginx 프록시로만 접근 |
+
+**컨테이너 실행 순서 (depends_on + healthcheck)**
+```
+kafka  ──┐
+mysql  ──┼──→ kafka-test1 ──┐
+redis  ──┘                  ├──→ kafka-frontend
+                            │
+kafka  ──┐                  │
+mysql  ──┴──→ kafka-test2 ──┘
+```
+> kafka healthcheck 통과까지 최대 2~3분 소요. 그 전에 test1/test2 는 대기 상태
+
+**웹 접속 방법**
+```
+# 로컬 실행 시
+http://localhost
+
+# ESXi VM 배포 시
+http://<VM-IP>         ← VM의 실제 IP 입력
+                         예) http://192.168.1.100
+
+# Kafka CLI 패널 Bootstrap Server
+localhost:29092        ← 로컬
+<VM-IP>:29092          ← VM
 ```
 
 **Docker Compose 구성 파일**
